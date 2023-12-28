@@ -29,8 +29,14 @@ func (s lestratSigner) Sign(blindedClaimsData []byte) ([]byte, error) {
 }
 
 func main() {
-	issuerPrivKey, issuerDID, _ := key.GenerateDIDKey(crypto.P256)
-	expandedIssuerDID, _ := issuerDID.Expand()
+	issuerPrivKey, issuerDID, err := key.GenerateDIDKey(crypto.P256)
+	if err != nil {
+		panic(err)
+	}
+	expandedIssuerDID, err := issuerDID.Expand()
+	if err != nil {
+		panic(err)
+	}
 	issuerKID := expandedIssuerDID.VerificationMethod[0].ID
 
 	credentialClaims := []byte(`{
@@ -39,7 +45,10 @@ func main() {
 	  "date_of_birth": "1967-01-24"
 	}`)
 
-	issuerSigner, _ := jwx.NewJWXSigner(issuerDID.String(), issuerKID, issuerPrivKey)
+	issuerSigner, err := jwx.NewJWXSigner(issuerDID.String(), issuerKID, issuerPrivKey)
+	if err != nil {
+		panic(err)
+	}
 	signer := sdjwt.NewSDJWTSigner(&lestratSigner{
 		*issuerSigner,
 	}, sdjwt.NewSaltGenerator(16))
@@ -50,16 +59,21 @@ func main() {
 		"date_of_birth": sdjwt.RecursiveBlindOption{},
 	})
 	if err != nil {
-		log.Fatal(err)
-		return
+		panic(err)
 	}
 	log.Println(string(issuanceFormat))
 
-	idxOfDisclosuresToPresent, _ := sdjwt.SelectDisclosures(issuanceFormat, map[string]struct{}{"date_of_birth": {}})
+	idxOfDisclosuresToPresent, err := sdjwt.SelectDisclosures(issuanceFormat, map[string]struct{}{"date_of_birth": {}})
+	if err != nil {
+		panic(err)
+	}
 	sdPresentation := sdjwt.CreatePresentation(issuanceFormat, idxOfDisclosuresToPresent, nil)
 	log.Println(string(sdPresentation))
 
-	issuerKey, _ := expandedIssuerDID.VerificationMethod[0].PublicKeyJWK.ToPublicKey()
+	issuerKey, err := expandedIssuerDID.VerificationMethod[0].PublicKeyJWK.ToPublicKey()
+	if err != nil {
+		panic(err)
+	}
 	processedPayload, err := sdjwt.VerifySDPresentation(sdPresentation,
 		sdjwt.VerificationOptions{
 			HolderBindingOption: sdjwt.SkipVerifyHolderBinding,
@@ -67,8 +81,7 @@ func main() {
 			IssuerKey:           issuerKey,
 		})
 	if err != nil {
-		log.Fatal(err)
-		return
+		panic(err)
 	}
 	log.Println(processedPayload)
 }
